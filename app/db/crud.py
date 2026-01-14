@@ -1,0 +1,292 @@
+# Indian Law RAG Chatbot - Database CRUD Operations
+"""
+Create, Read, Update, Delete operations for database models.
+Provides a clean abstraction layer over SQLAlchemy operations.
+"""
+
+import uuid
+from datetime import datetime
+from typing import Optional, List
+from sqlalchemy.orm import Session
+from sqlalchemy import desc
+import logging
+
+from app.db.models import User, ChatSession, ChatMessage, QueryLog, MessageRole
+from app.schemas.user import UserCreate
+from app.utils.auth import get_password_hash, verify_password
+
+logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# User CRUD Operations
+# =============================================================================
+class UserCRUD:
+    """CRUD operations for User model."""
+    
+    @staticmethod
+    def create(db: Session, user_data: UserCreate) -> User:
+        """
+        Create a new user.
+        
+        Args:
+            db: Database session
+            user_data: User creation data
+            
+        Returns:
+            User: Created user object
+        """
+        hashed_password = get_password_hash(user_data.password)
+        db_user = User(
+            email=user_data.email,
+            hashed_password=hashed_password,
+            full_name=user_data.full_name
+        )
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+        logger.info(f"Created user: {db_user.email}")
+        return db_user
+    
+    @staticmethod
+    def get_by_email(db: Session, email: str) -> Optional[User]:
+        """Get user by email address."""
+        return db.query(User).filter(User.email == email).first()
+    
+    @staticmethod
+    def get_by_id(db: Session, user_id: uuid.UUID) -> Optional[User]:
+        """Get user by ID."""
+        return db.query(User).filter(User.id == user_id).first()
+    
+    @staticmethod
+    def authenticate(db: Session, email: str, password: str) -> Optional[User]:
+        """
+        Authenticate user with email and password.
+        
+        Returns:
+            User if authentication successful, None otherwise
+        """
+        user = UserCRUD.get_by_email(db, email)
+        if not user:
+            return None
+        if not verify_password(password, user.hashed_password):
+            return None
+        return user
+    
+    @staticmethod
+    def update_password(db: Session, user: User, new_password: str) -> User:
+        """Update user's password."""
+        user.hashed_password = get_password_hash(new_password)
+        db.commit()
+        db.refresh(user)
+        return user
+
+
+# =============================================================================
+# Chat Session CRUD Operations
+# =============================================================================
+class ChatSessionCRUD:
+    """CRUD operations for ChatSession model."""
+    
+    @staticmethod
+    def create(
+        db: Session, 
+        user_id: Optional[uuid.UUID] = None,
+        title: str = "New Chat"
+    ) -> ChatSession:
+        """Create a new chat session."""
+        session = ChatSession(user_id=user_id, title=title)
+        db.add(session)
+        db.commit()
+        db.refresh(session)
+        logger.info(f"Created chat session: {session.id}")
+        return session
+    
+    @staticmethod
+    def get_by_id(db: Session, session_id: uuid.UUID) -> Optional[ChatSession]:
+        """Get chat session by ID."""
+        return db.query(ChatSession).filter(ChatSession.id == session_id).first()
+    
+    @staticmethod
+    def get_user_sessions(
+        db: Session, 
+        user_id: uuid.UUID,
+        limit: int = 20,
+        offset: int = 0
+    ) -> List[ChatSession]:
+        """Get all chat sessions for a user."""
+        return (
+            db.query(ChatSession)
+            .filter(ChatSession.user_id == user_id)
+            .order_by(desc(ChatSession.updated_at))
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+    
+    @staticmethod
+    def update_title(
+        db: Session, 
+        session: ChatSession, 
+        title: str
+    ) -> ChatSession:
+        """Update session title."""
+        session.title = title
+        session.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(session)
+        return session
+    
+    @staticmethod
+    def delete(db: Session, session: ChatSession) -> None:
+        """Delete a chat session and all its messages."""
+        db.delete(session)
+        db.commit()
+        logger.info(f"Deleted chat session: {session.id}")
+
+
+# =============================================================================
+# Chat Message CRUD Operations
+# =============================================================================
+class ChatMessageCRUD:
+    """CRUD operations for ChatMessage model."""
+    
+    @staticmethod
+    def create(
+        db: Session,
+        session_id: uuid.UUID,
+        role: MessageRole,
+        content: str,
+        sources: Optional[List[dict]] = None
+    ) -> ChatMessage:
+        """Create a new chat message."""
+        message = ChatMessage(
+            session_id=session_id,
+            role=role,
+            content=content,
+            sources=sources or []
+        )
+        db.add(message)
+        
+        # Update session's updated_at timestamp
+        session = db.query(ChatSession).filter(
+            ChatSession.id == session_id
+        ).first()
+        if session:
+            session.updated_at = datetime.utcnow()
+        
+        db.commit()
+        db.refresh(message)
+        return message
+    
+    @staticmethod
+    def get_session_messages(
+        db: Session,
+        session_id: uuid.UUID,
+        limit: Optional[int] = None
+    ) -> List[ChatMessage]:
+        """Get all messages in a session."""
+        query = (
+            db.query(ChatMessage)
+            .filter(ChatMessage.session_id == session_id)
+            .order_by(ChatMessage.created_at)
+        )
+        if limit:
+            query = query.limit(limit)
+        return query.all()
+    
+    @staticmethod
+    def get_recent_context(
+        db: Session,
+        session_id: uuid.UUID,
+        limit: int = 10
+    ) -> List[ChatMessage]:
+        """Get recent messages for conversation context."""
+        return (
+            db.query(ChatMessage)
+            .filter(ChatMessage.session_id == session_id)
+            .order_by(desc(ChatMessage.created_at))
+            .limit(limit)
+            .all()
+        )[::-1]  # Reverse to get chronological order
+
+
+# =============================================================================
+# Query Log CRUD Operations
+# =============================================================================
+class QueryLogCRUD:
+    """CRUD operations for QueryLog model."""
+    
+    @staticmethod
+    def create(
+        db: Session,
+        query: str,
+        user_id: Optional[uuid.UUID] = None,
+        retrieved_docs: Optional[List[dict]] = None,
+        response: Optional[str] = None,
+        sources: Optional[List[dict]] = None,
+        latency_ms: Optional[int] = None,
+        was_successful: bool = True,
+        error_message: Optional[str] = None
+    ) -> QueryLog:
+        """Log a RAG query."""
+        log = QueryLog(
+            user_id=user_id,
+            query=query,
+            retrieved_docs=retrieved_docs or [],
+            response=response,
+            sources=sources or [],
+            latency_ms=latency_ms,
+            was_successful=was_successful,
+            error_message=error_message
+        )
+        db.add(log)
+        db.commit()
+        db.refresh(log)
+        return log
+    
+    @staticmethod
+    def get_user_queries(
+        db: Session,
+        user_id: uuid.UUID,
+        limit: int = 50,
+        offset: int = 0
+    ) -> List[QueryLog]:
+        """Get query history for a user."""
+        return (
+            db.query(QueryLog)
+            .filter(QueryLog.user_id == user_id)
+            .order_by(desc(QueryLog.created_at))
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+    
+    @staticmethod
+    def get_failed_queries(
+        db: Session,
+        limit: int = 100
+    ) -> List[QueryLog]:
+        """Get recent failed queries for debugging."""
+        return (
+            db.query(QueryLog)
+            .filter(QueryLog.was_successful == False)
+            .order_by(desc(QueryLog.created_at))
+            .limit(limit)
+            .all()
+        )
+    
+    @staticmethod
+    def get_average_latency(db: Session, days: int = 7) -> float:
+        """Get average query latency over the specified period."""
+        from sqlalchemy import func
+        from datetime import timedelta
+        
+        cutoff = datetime.utcnow() - timedelta(days=days)
+        result = (
+            db.query(func.avg(QueryLog.latency_ms))
+            .filter(QueryLog.created_at >= cutoff)
+            .filter(QueryLog.latency_ms.isnot(None))
+            .scalar()
+        )
+        return float(result) if result else 0.0
