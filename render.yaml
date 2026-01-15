@@ -31,18 +31,14 @@ services:
         value: ./data/faiss_index
     healthCheckPath: /health
 
-  # Frontend - React Static Site
-  - type: web
-    name: nyayasahay-frontend
-    runtime: static
+# Frontend - React Static Site (separate section for static sites)
+staticSites:
+  - name: nyayasahay-frontend
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: frontend/dist
     envVars:
       - key: VITE_API_URL
-        fromService:
-          name: nyayasahay-api
-          type: web
-          property: host
+        value: https://nyayasahay-api.onrender.com
     routes:
       - type: rewrite
         source: /*
