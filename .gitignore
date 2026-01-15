@@ -63,3 +63,15 @@ htmlcov/
 
 # mypy
 .mypy_cache/
+
+# FAISS and AI models (large files - never commit!)
+data/faiss_index/
+models/
+*.bin
+*.pt
+*.pth
+*.onnx
+*.pkl
+
+# Node modules (if any)
+node_modules/

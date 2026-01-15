@@ -7,15 +7,10 @@ python-multipart>=0.0.6
 langchain>=0.1.0
 langchain-community>=0.0.13
 langchain-google-genai>=0.0.6
-langchain-openai>=0.0.5
 google-generativeai>=0.3.2
 
-# Vector Store
-faiss-cpu>=1.7.4
-
-# Dataset
-datasets>=2.16.0
-huggingface-hub>=0.20.0
+# Vector Store (pgvector only - no FAISS)
+# faiss-cpu removed to reduce deploy size
 
 # Database
 sqlalchemy>=2.0.25
@@ -38,4 +33,6 @@ bcrypt>=4.1.2
 httpx>=0.26.0
 tenacity>=8.2.3
 PyMuPDF>=1.23.0
-sentence-transformers>=2.2.2
+
+# NOTE: sentence-transformers REMOVED (saves 400MB!)
+# Using Gemini embeddings instead - set EMBEDDING_PROVIDER=gemini

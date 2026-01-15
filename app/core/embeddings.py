@@ -37,16 +37,20 @@ def get_embedding_model() -> Embeddings:
     provider = settings.embedding_provider
     
     if provider == "huggingface":
-        from langchain_community.embeddings import HuggingFaceEmbeddings
-        
-        logger.info(f"Using HuggingFace local embeddings: {settings.huggingface_embedding_model}")
-        return HuggingFaceEmbeddings(
-            model_name=settings.huggingface_embedding_model,
-            model_kwargs={'device': 'cpu'},
-            encode_kwargs={'normalize_embeddings': True}
-        )
+        try:
+            from langchain_community.embeddings import HuggingFaceEmbeddings
+            
+            logger.info(f"Using HuggingFace local embeddings: {settings.huggingface_embedding_model}")
+            return HuggingFaceEmbeddings(
+                model_name=settings.huggingface_embedding_model,
+                model_kwargs={'device': 'cpu'},
+                encode_kwargs={'normalize_embeddings': True}
+            )
+        except ImportError:
+            logger.warning("sentence-transformers not installed, falling back to Gemini")
+            provider = "gemini"  # Fallback to Gemini
     
-    elif provider == "openai":
+    if provider == "openai":
         from langchain_openai import OpenAIEmbeddings
         
         if not settings.openai_api_key:
@@ -58,7 +62,7 @@ def get_embedding_model() -> Embeddings:
             model="text-embedding-ada-002"
         )
     
-    elif provider == "gemini":
+    if provider == "gemini":
         from langchain_google_genai import GoogleGenerativeAIEmbeddings
         
         if not settings.google_api_key:
@@ -70,8 +74,7 @@ def get_embedding_model() -> Embeddings:
             model="models/embedding-001"
         )
     
-    else:
-        raise ValueError(f"Unsupported embedding provider: {provider}")
+    raise ValueError(f"Unsupported embedding provider: {provider}")
 
 
 class EmbeddingGenerator:
