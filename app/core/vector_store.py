@@ -177,8 +177,18 @@ class VectorStoreManager:
         - FAISS finds k-nearest neighbors in vector space
         - Returns documents ordered by similarity
         """
+        # Lazy load if not already loaded
         if self._vector_store is None:
-            raise ValueError("Vector store not loaded")
+            logger.info("Lazy loading vector store for first request...")
+            try:
+                self.load()
+            except Exception as e:
+                logger.error(f"Failed to lazy load vector store: {e}")
+                # Return empty list if loading fails to prevent crash
+                return []
+        
+        if self._vector_store is None:
+             raise ValueError("Vector store failed to load")
         
         logger.debug(f"Searching for: {query[:100]}...")
         
@@ -207,8 +217,17 @@ class VectorStoreManager:
         - Useful for filtering low-confidence results
         - Can set threshold to reject irrelevant documents
         """
+        # Lazy load if not already loaded
         if self._vector_store is None:
-            raise ValueError("Vector store not loaded")
+            logger.info("Lazy loading vector store for first request...")
+            try:
+                self.load()
+            except Exception as e:
+                logger.error(f"Failed to lazy load vector store: {e}")
+                return []
+
+        if self._vector_store is None:
+             raise ValueError("Vector store failed to load")
         
         results = self._vector_store.similarity_search_with_score(query, k=k)
         return results

@@ -64,17 +64,18 @@ async def lifespan(app: FastAPI):
         # Continue anyway - database might just need connection
     
     # Load vector store
-    try:
-        vector_store_manager.load()
-        doc_count = vector_store_manager.get_document_count()
-        logger.info(f"✓ Vector store loaded ({doc_count} documents)")
-    except FileNotFoundError:
-        logger.warning(
-            "⚠ Vector store not found. Run 'python scripts/create_embeddings.py' "
-            "to create the FAISS index."
-        )
-    except Exception as e:
-        logger.error(f"✗ Vector store loading failed: {e}")
+    # NOTE: Disabled for deployment speed. Lazy loading implemented in vector_store.py
+    # try:
+    #     vector_store_manager.load()
+    #     doc_count = vector_store_manager.get_document_count()
+    #     logger.info(f"✓ Vector store loaded ({doc_count} documents)")
+    # except FileNotFoundError:
+    #     logger.warning(
+    #         "⚠ Vector store not found. Run 'python scripts/create_embeddings.py' "
+    #         "to create the FAISS index."
+    #     )
+    # except Exception as e:
+    #     logger.error(f"✗ Vector store loading failed: {e}")
     
     logger.info("Application startup complete")
     logger.info("=" * 60)
