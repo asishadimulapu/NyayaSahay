@@ -420,7 +420,7 @@ class DocumentEmbedding(Base):
         index=True,
         comment="Type of legal act (IPC, CrPC, Constitution, etc.)"
     )
-    metadata = Column(
+    extra_data = Column(
         JSONB, 
         nullable=True,
         default=dict,

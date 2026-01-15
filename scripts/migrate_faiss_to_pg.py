@@ -136,7 +136,7 @@ def migrate_embeddings(faiss_store, batch_size=100):
                         section=metadata.get("section"),
                         title=metadata.get("title"),
                         act_type=metadata.get("act_type"),
-                        metadata=metadata
+                        extra_data=metadata
                     )
                     db.add(doc_embedding)
                     migrated += 1

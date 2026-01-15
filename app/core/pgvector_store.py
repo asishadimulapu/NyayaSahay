@@ -106,7 +106,7 @@ class PgVectorStore:
                         section=metadata.get("section"),
                         title=metadata.get("title"),
                         act_type=metadata.get("act_type"),
-                        metadata=metadata
+                        extra_data=metadata
                     )
                     db.add(doc_embedding)
                     added_count += 1
@@ -148,7 +148,7 @@ class PgVectorStore:
             # pgvector uses <=> for cosine distance, <-> for L2
             results = db.execute(
                 text("""
-                    SELECT id, content, source, section, title, act_type, metadata,
+                    SELECT id, content, source, section, title, act_type, extra_data,
                            1 - (embedding <=> :query_embedding::vector) as similarity
                     FROM document_embeddings
                     ORDER BY embedding <=> :query_embedding::vector
@@ -163,7 +163,7 @@ class PgVectorStore:
             # Convert to LangChain Documents
             documents = []
             for row in results:
-                metadata = row.metadata or {}
+                metadata = row.extra_data or {}
                 metadata.update({
                     "source": row.source,
                     "section": row.section,
@@ -208,7 +208,7 @@ class PgVectorStore:
         try:
             results = db.execute(
                 text("""
-                    SELECT id, content, source, section, title, act_type, metadata,
+                    SELECT id, content, source, section, title, act_type, extra_data,
                            embedding <=> :query_embedding::vector as distance
                     FROM document_embeddings
                     ORDER BY embedding <=> :query_embedding::vector
@@ -222,7 +222,7 @@ class PgVectorStore:
             
             documents_with_scores = []
             for row in results:
-                metadata = row.metadata or {}
+                metadata = row.extra_data or {}
                 metadata.update({
                     "source": row.source,
                     "section": row.section,
