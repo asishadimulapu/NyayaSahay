@@ -23,8 +23,13 @@ function getAuthHeaders() {
 
 /**
  * Send a chat query to the RAG pipeline
+ * Note: First request after cold start may take 60-90 seconds (loading AI models)
  */
 export async function sendChatMessage(query, sessionId = null) {
+    // Create abort controller with 120 second timeout for cold starts
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+
     try {
         const response = await fetch(`${API_BASE_URL}/api/v1/chat`, {
             method: 'POST',
@@ -36,7 +41,10 @@ export async function sendChatMessage(query, sessionId = null) {
                 query: query,
                 session_id: sessionId,
             }),
+            signal: controller.signal,
         });
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
@@ -45,6 +53,11 @@ export async function sendChatMessage(query, sessionId = null) {
 
         return await response.json();
     } catch (error) {
+        clearTimeout(timeoutId);
+
+        if (error.name === 'AbortError') {
+            throw new Error('Request timed out. The server may be starting up (cold start). Please try again in 30 seconds.');
+        }
         if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
             throw new Error('Unable to connect to the server. Please ensure the backend is running.');
         }
