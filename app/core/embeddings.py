@@ -35,7 +35,7 @@ class HuggingFaceInferenceAPIEmbeddings(Embeddings):
     def __init__(self, api_key: str, model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
         self.api_key = api_key
         self.model_name = model_name
-        self.api_url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{model_name}"
+        self.api_url = f"https://router.huggingface.co/hf-inference/pipeline/feature-extraction/{model_name}"
     
     def _embed(self, texts: List[str]) -> List[List[float]]:
         """Call HuggingFace Inference API."""
